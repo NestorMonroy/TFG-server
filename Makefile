@@ -1,4 +1,4 @@
-.PHONY: help test test-shunit2 test-all lint lint-markdown lint-shell docs ci release clean install-hooks version
+.PHONY: help test test-shunit2 test-all lint lint-markdown lint-shell docs ci release clean install-hooks version lab-quick lab-professional lab-complete lab-destroy lab-status
 
 # Variables
 SHELL := /bin/bash
@@ -149,3 +149,45 @@ check-deps:
 		echo -e "$(COLOR_ERROR)[check-deps] Faltan $$missing dependencia(s)$(COLOR_RESET)"; \
 		exit 1; \
 	fi
+
+#------------------------------------------------------------------------------
+# VAGRANT LABS - VPN and Network Tunnels
+# ADR: docs/diseno_solucion/arquitectura_sistemas/adr/0005-vagrant-laboratorios-vpn.md
+#------------------------------------------------------------------------------
+
+VAGRANT_DIR := $(ROOT_DIR)/infra/vagrant
+
+## lab-quick: Inicia laboratorio Quick Start (SSH puerto 53, 45 min → 5 min)
+lab-quick:
+	@echo -e "$(COLOR_INFO)[lab-quick] Iniciando laboratorio Quick Start...$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-quick] SSH túnel en puerto 53 para acceso rápido a APIs$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant up --vagrantfile=Vagrantfile.quick_start
+	@echo -e "$(COLOR_SUCCESS)[lab-quick] Laboratorio Quick Start iniciado$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-quick] Conectar: cd $(VAGRANT_DIR) && vagrant ssh$(COLOR_RESET)"
+
+## lab-professional: Inicia laboratorio Professional (SSH robusto, 4h → 15 min)
+lab-professional:
+	@echo -e "$(COLOR_INFO)[lab-professional] Iniciando laboratorio Professional...$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-professional] Servidor SSH con seguridad y monitoreo$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant up --vagrantfile=Vagrantfile.professional_tunnel
+	@echo -e "$(COLOR_SUCCESS)[lab-professional] Laboratorio Professional iniciado$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-professional] Conectar: cd $(VAGRANT_DIR) && vagrant ssh$(COLOR_RESET)"
+
+## lab-complete: Inicia laboratorio Complete (Servidor completo, 9h → 30 min)
+lab-complete:
+	@echo -e "$(COLOR_INFO)[lab-complete] Iniciando laboratorio Complete Homeserver...$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-complete] WireGuard + Pi-Hole + Nextcloud + Netdata$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant up --vagrantfile=Vagrantfile.complete_homeserver
+	@echo -e "$(COLOR_SUCCESS)[lab-complete] Laboratorio Complete iniciado$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-complete] Conectar: cd $(VAGRANT_DIR) && vagrant ssh$(COLOR_RESET)"
+
+## lab-status: Muestra estado de laboratorios Vagrant
+lab-status:
+	@echo -e "$(COLOR_INFO)[lab-status] Estado de laboratorios Vagrant:$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant global-status | grep "TFG-VPN" || echo "  No hay laboratorios activos"
+
+## lab-destroy: Destruye todos los laboratorios Vagrant
+lab-destroy:
+	@echo -e "$(COLOR_INFO)[lab-destroy] Destruyendo laboratorios Vagrant...$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant destroy -f || true
+	@echo -e "$(COLOR_SUCCESS)[lab-destroy] Laboratorios destruidos$(COLOR_RESET)"

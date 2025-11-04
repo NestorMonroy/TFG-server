@@ -1,0 +1,92 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile.quick_start
+# Laboratorio 1: SSH Túnel en Puerto 53 para Acceso Rápido a APIs
+#
+# Caso de uso: Developer necesita acceso YA a Claude API bloqueada
+# Tiempo: 45 minutos (manual) → 5 minutos (automatizado)
+# Complejidad: ⭐⭐ (Baja)
+# Éxito esperado: 90%
+#
+# Servicios instalados:
+# - SSH en puerto 53 (TCP)
+# - Túnel SOCKS5 en puerto 1080
+# - Tests de conectividad automatizados
+#
+# ADR: docs/diseno_solucion/arquitectura_sistemas/adr/0005-vagrant-laboratorios-vpn.md
+
+Vagrant.configure("2") do |config|
+  # Box base: Ubuntu 22.04 LTS (Jammy Jellyfish)
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.box_version = ">= 20231215.0.0"
+  config.vm.hostname = "vpn-quick-start"
+
+  # Red privada: permite acceso desde host
+  config.vm.network "private_network", ip: "192.168.56.10"
+
+  # Puerto 53 TCP: forwarding para SSH tunnel
+  # Host:5353 → Guest:53
+  config.vm.network "forwarded_port",
+    guest: 53,
+    host: 5353,
+    protocol: "tcp",
+    auto_correct: true
+
+  # Puerto SSH estándar (fallback)
+  config.vm.network "forwarded_port",
+    guest: 22,
+    host: 2210,
+    id: "ssh",
+    auto_correct: true
+
+  # VirtualBox provider configuration
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "TFG-VPN-QuickStart"
+    vb.memory = "512"   # 512MB suficiente para SSH túnel
+    vb.cpus = 1
+    vb.linked_clone = true  # Faster creation using COW
+
+    # Optimizaciones de rendimiento
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
+  end
+
+  # Provisioning: Shell scripts con Clean Code naming
+  # Orden de ejecución es importante
+
+  # 1. Establecer túnel SSH en puerto 53
+  config.vm.provision "shell",
+    name: "establish-ssh-tunnel-port-53",
+    path: "provisioning/establish_ssh_tunnel_on_port_53.sh",
+    privileged: true
+
+  # 2. Validar conectividad del túnel
+  config.vm.provision "shell",
+    name: "validate-tunnel-connectivity",
+    path: "provisioning/validate_tunnel_connectivity.sh",
+    privileged: false
+
+  # Mensaje post-up
+  config.vm.post_up_message = <<~MSG
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║   SSH Túnel en Puerto 53 - Lab Quick Start                   ║
+    ╠═══════════════════════════════════════════════════════════════╣
+    ║                                                               ║
+    ║   VM IP: 192.168.56.10                                        ║
+    ║   SSH Port: 5353 (host) → 53 (guest)                          ║
+    ║   SOCKS5 Proxy: localhost:1080                                ║
+    ║                                                               ║
+    ║   Conectar:                                                   ║
+    ║   $ vagrant ssh                                               ║
+    ║                                                               ║
+    ║   Probar túnel:                                               ║
+    ║   $ curl --socks5 localhost:1080 https://api.anthropic.com   ║
+    ║                                                               ║
+    ║   Documentación: infra/vagrant/README.md                      ║
+    ║   ADR: docs/.../adr/0005-vagrant-laboratorios-vpn.md          ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+  MSG
+end

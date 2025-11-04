@@ -1,0 +1,128 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile.professional_tunnel
+# Laboratorio 2: Servidor SSH Profesional con Seguridad y Monitoreo
+#
+# Caso de uso: Equipo necesita túnel robusto para producción
+# Tiempo: 4 horas (manual) → 15 minutos (automatizado)
+# Complejidad: ⭐⭐⭐⭐ (Media-Alta)
+# Éxito esperado: 85%
+#
+# Servicios instalados:
+# - SSH con autenticación por clave
+# - Fail2Ban (protección brute-force)
+# - UFW (firewall configurado)
+# - Servicio systemd con auto-restart
+# - Monitoreo básico (logs, métricas)
+#
+# ADR: docs/diseno_solucion/arquitectura_sistemas/adr/0005-vagrant-laboratorios-vpn.md
+
+Vagrant.configure("2") do |config|
+  # Box base: Ubuntu 22.04 LTS (Jammy Jellyfish)
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.box_version = ">= 20231215.0.0"
+  config.vm.hostname = "vpn-professional"
+
+  # Red privada: permite acceso desde host
+  config.vm.network "private_network", ip: "192.168.56.20"
+
+  # Puerto SSH estándar
+  config.vm.network "forwarded_port",
+    guest: 22,
+    host: 2220,
+    id: "ssh",
+    auto_correct: true
+
+  # Puerto SSH alternativo (443 para bypass)
+  config.vm.network "forwarded_port",
+    guest: 443,
+    host: 4430,
+    protocol: "tcp",
+    auto_correct: true
+
+  # Puerto SOCKS5 proxy
+  config.vm.network "forwarded_port",
+    guest: 1080,
+    host: 1080,
+    protocol: "tcp",
+    auto_correct: true
+
+  # VirtualBox provider configuration
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "TFG-VPN-Professional"
+    vb.memory = "1024"   # 1GB para servicios de seguridad
+    vb.cpus = 2
+    vb.linked_clone = true
+
+    # Optimizaciones de rendimiento
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
+    vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
+    vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
+  end
+
+  # Provisioning: Shell scripts con Clean Code naming
+  # Orden de ejecución es importante
+
+  # 1. Instalar paquetes de seguridad base
+  config.vm.provision "shell",
+    name: "install-security-packages",
+    path: "provisioning/install_security_packages.sh",
+    privileged: true
+
+  # 2. Configurar servidor SSH profesional
+  config.vm.provision "shell",
+    name: "configure-professional-ssh-server",
+    path: "provisioning/configure_professional_ssh_server.sh",
+    privileged: true
+
+  # 3. Validar conectividad y seguridad
+  config.vm.provision "shell",
+    name: "validate-tunnel-connectivity",
+    path: "provisioning/validate_tunnel_connectivity.sh",
+    privileged: false
+
+  # Synced folder: compartir scripts para desarrollo
+  config.vm.synced_folder ".", "/vagrant",
+    owner: "vagrant",
+    group: "vagrant",
+    mount_options: ["dmode=775,fmode=664"]
+
+  # Mensaje post-up
+  config.vm.post_up_message = <<~MSG
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║   SSH Túnel Profesional - Lab Professional                   ║
+    ╠═══════════════════════════════════════════════════════════════╣
+    ║                                                               ║
+    ║   VM IP: 192.168.56.20                                        ║
+    ║   SSH Port: 2220 (host) → 22 (guest)                          ║
+    ║   SSH Alt: 4430 (host) → 443 (guest)                          ║
+    ║   SOCKS5: 1080 (both)                                         ║
+    ║                                                               ║
+    ║   Servicios instalados:                                       ║
+    ║   ✓ SSH con autenticación por clave                           ║
+    ║   ✓ Fail2Ban (protección brute-force)                         ║
+    ║   ✓ UFW (firewall)                                            ║
+    ║   ✓ Servicio systemd (auto-restart)                           ║
+    ║   ✓ Monitoreo básico                                          ║
+    ║                                                               ║
+    ║   Conectar:                                                   ║
+    ║   $ vagrant ssh                                               ║
+    ║                                                               ║
+    ║   Verificar servicios:                                        ║
+    ║   $ sudo systemctl status ssh-tunnel                          ║
+    ║   $ sudo systemctl status fail2ban                            ║
+    ║   $ sudo ufw status verbose                                   ║
+    ║                                                               ║
+    ║   Ver logs:                                                   ║
+    ║   $ sudo journalctl -u ssh-tunnel -f                          ║
+    ║   $ sudo tail -f /var/log/fail2ban.log                        ║
+    ║                                                               ║
+    ║   Documentación: infra/vagrant/README.md                      ║
+    ║   ADR: docs/.../adr/0005-vagrant-laboratorios-vpn.md          ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+  MSG
+end
