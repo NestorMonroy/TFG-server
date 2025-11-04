@@ -1,4 +1,4 @@
-.PHONY: help test test-shunit2 test-all lint lint-markdown lint-shell docs ci release clean install-hooks version lab-quick lab-professional lab-complete lab-destroy lab-status
+.PHONY: help test test-shunit2 test-all lint lint-markdown lint-shell docs ci release clean install-hooks version lab-quick lab-professional lab-complete lab-dev lab-destroy lab-status lab-ci lab-test lab-exec
 
 # Variables
 SHELL := /bin/bash
@@ -186,8 +186,39 @@ lab-status:
 	@echo -e "$(COLOR_INFO)[lab-status] Estado de laboratorios Vagrant:$(COLOR_RESET)"
 	@cd $(VAGRANT_DIR) && vagrant global-status | grep "TFG-VPN" || echo "  No hay laboratorios activos"
 
+## lab-dev: Inicia laboratorio Development (VM completa para desarrollo)
+lab-dev:
+	@echo -e "$(COLOR_INFO)[lab-dev] Iniciando laboratorio Development...$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-dev] VM completa con BATS, shellcheck, mkdocs, etc.$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant up --vagrantfile=Vagrantfile.development
+	@echo -e "$(COLOR_SUCCESS)[lab-dev] Laboratorio Development iniciado$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-dev] Conectar: cd $(VAGRANT_DIR) && vagrant ssh$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-dev] Ejecutar CI: make lab-ci$(COLOR_RESET)"
+
 ## lab-destroy: Destruye todos los laboratorios Vagrant
 lab-destroy:
 	@echo -e "$(COLOR_INFO)[lab-destroy] Destruyendo laboratorios Vagrant...$(COLOR_RESET)"
 	@cd $(VAGRANT_DIR) && vagrant destroy -f || true
 	@echo -e "$(COLOR_SUCCESS)[lab-destroy] Laboratorios destruidos$(COLOR_RESET)"
+
+## lab-ci: Ejecuta CI completo dentro de la VM de desarrollo
+lab-ci:
+	@echo -e "$(COLOR_INFO)[lab-ci] Ejecutando CI dentro de VM de desarrollo...$(COLOR_RESET)"
+	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh development "cd /vagrant && make ci"
+	@echo -e "$(COLOR_SUCCESS)[lab-ci] CI ejecutado en VM$(COLOR_RESET)"
+
+## lab-test: Ejecuta tests dentro de la VM de desarrollo
+lab-test:
+	@echo -e "$(COLOR_INFO)[lab-test] Ejecutando tests dentro de VM de desarrollo...$(COLOR_RESET)"
+	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh development "cd /vagrant && make test"
+	@echo -e "$(COLOR_SUCCESS)[lab-test] Tests ejecutados en VM$(COLOR_RESET)"
+
+## lab-exec: Ejecuta comando arbitrario en VM (uso: make lab-exec LAB=dev CMD="ls -la")
+lab-exec:
+	@if [ -z "$(LAB)" ] || [ -z "$(CMD)" ]; then \
+		echo -e "$(COLOR_ERROR)[lab-exec] ERROR: Requiere LAB y CMD$(COLOR_RESET)"; \
+		echo -e "$(COLOR_INFO)[lab-exec] Uso: make lab-exec LAB=development CMD=\"make ci\"$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@echo -e "$(COLOR_INFO)[lab-exec] Ejecutando en $(LAB): $(CMD)$(COLOR_RESET)"
+	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh $(LAB) "$(CMD)"

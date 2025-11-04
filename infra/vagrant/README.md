@@ -4,11 +4,12 @@ Infraestructura automatizada para aprender, validar y desarrollar configuracione
 
 ## Propósito
 
-Este directorio contiene **3 laboratorios Vagrant** que implementan los flujos documentados en el análisis de 662 tareas:
+Este directorio contiene **4 laboratorios Vagrant** que implementan los flujos documentados en el análisis de 662 tareas:
 
-1. **Quick Start** (45 min) - SSH túnel puerto 53
-2. **Professional** (4 horas) - Servidor SSH seguro y robusto
-3. **Complete Homeserver** (9 horas) - Infraestructura completa
+1. **Development** (10 min) - VM completa para desarrollar y ejecutar CI
+2. **Quick Start** (45 min) - SSH túnel puerto 53
+3. **Professional** (4 horas) - Servidor SSH seguro y robusto
+4. **Complete Homeserver** (9 horas) - Infraestructura completa
 
 ## Prerequisitos
 
@@ -48,6 +49,7 @@ choco install vagrant virtualbox
 ```
 infra/vagrant/
 ├── README.md                                    # Este archivo
+├── Vagrantfile.development                      # Lab 0: Desarrollo completo
 ├── Vagrantfile.quick_start                      # Lab 1: SSH puerto 53
 ├── Vagrantfile.professional_tunnel              # Lab 2: Servidor SSH profesional
 ├── Vagrantfile.complete_homeserver              # Lab 3: Infraestructura completa
@@ -64,17 +66,23 @@ infra/vagrant/
 ### Desde Makefile (Recomendado)
 
 ```bash
-# Iniciar laboratorio Quick Start
-make lab-quick
+# Desarrollo: VM completa con todas las herramientas
+make lab-dev            # Iniciar VM de desarrollo
+make lab-ci             # Ejecutar CI dentro de la VM
+make lab-test           # Ejecutar tests dentro de la VM
 
-# Iniciar laboratorio Professional
-make lab-professional
+# Laboratorios de VPN
+make lab-quick          # Iniciar Lab Quick Start (SSH puerto 53)
+make lab-professional   # Iniciar Lab Professional
+make lab-complete       # Iniciar Lab Complete Homeserver
 
-# Iniciar laboratorio Complete
-make lab-complete
+# Gestión
+make lab-status         # Ver estado de laboratorios
+make lab-destroy        # Destruir todos los laboratorios
 
-# Destruir todos los laboratorios
-make lab-destroy
+# Ejecutar comandos arbitrarios
+make lab-exec LAB=development CMD="make lint"
+make lab-exec LAB=quick_start CMD="ls -la"
 ```
 
 ### Directamente con Vagrant
@@ -99,6 +107,74 @@ vagrant destroy -f
 ```
 
 ## Laboratorios Disponibles
+
+### Lab 0: Development (Desarrollo Completo) 🆕
+
+**Caso de uso**: Desarrollar y ejecutar CI/tests dentro de Vagrant en un entorno aislado.
+
+**Tiempo**: 10 minutos setup inicial.
+
+**Recursos**: 2048 MB RAM, 2 CPUs.
+
+**Qué hace**:
+- ✅ Sincroniza TODO el proyecto (`/vagrant`)
+- ✅ Instala TODAS las dependencias de desarrollo
+- ✅ Ejecuta `make ci`, `make test`, `make lint` dentro de la VM
+- ✅ Entorno completamente aislado del host
+
+**Herramientas instaladas**:
+- BATS (testing)
+- shellcheck (linting)
+- markdownlint-cli2 (linting)
+- MkDocs + plugins (documentación)
+- Python 3 + pip
+- Node.js + npm
+
+**Iniciar**:
+```bash
+make lab-dev
+# O
+vagrant up --vagrantfile=Vagrantfile.development
+```
+
+**Ejecutar CI dentro de la VM**:
+```bash
+# Opción 1: Desde el host
+make lab-ci       # Ejecuta make ci dentro de la VM
+make lab-test     # Ejecuta make test dentro de la VM
+
+# Opción 2: SSH a la VM
+vagrant ssh
+cd /vagrant       # Proyecto sincronizado
+make ci           # Ejecutar CI
+make test         # Ejecutar tests
+make lint         # Ejecutar linters
+```
+
+**Ejecutar comandos arbitrarios**:
+```bash
+# Desde el host
+make lab-exec LAB=development CMD="make lint"
+make lab-exec LAB=development CMD="bats test/vagrant.bats"
+make lab-exec LAB=development CMD="ls -la /vagrant"
+
+# O con el script directamente
+./scripts/bash/vagrant-exec.sh development "make ci"
+```
+
+**Aplicaciones**:
+- Desarrollo sin contaminar el sistema host
+- Validar CI en ambiente limpio antes de push
+- Testing en Ubuntu cuando desarrollas en macOS/Windows
+- Reproducir bugs reportados en Linux
+
+**Ventajas**:
+- ✅ **Sin conflictos**: No afecta dependencias del host
+- ✅ **Reproducible**: Todos tienen mismo ambiente
+- ✅ **Limpio**: `vagrant destroy` limpia todo
+- ✅ **Rápido**: Synced folder = cambios instantáneos
+
+---
 
 ### Lab 1: Quick Start (SSH Túnel Puerto 53)
 
