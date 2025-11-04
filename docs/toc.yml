@@ -51,6 +51,8 @@
           href: diseno_solucion/arquitectura_sistemas/adr/0003-servidor-mcp-shell.md
         - name: ADR 0004 - Migración a MkDocs
           href: diseno_solucion/arquitectura_sistemas/adr/0004-migracion-mkdocs.md
+        - name: ADR 0005 - Vagrant para Laboratorios VPN
+          href: diseno_solucion/arquitectura_sistemas/adr/0005-vagrant-laboratorios-vpn.md
 - name: Implementación Técnica
   href: implementacion/readme.md
   items:
@@ -63,11 +65,20 @@
       items:
         - name: Servidor MCP (Model Context Protocol)
           href: implementacion/infrastructure/mcp-server.md
+        - name: Laboratorios Vagrant (VPN y Túneles)
+          href: implementacion/infrastructure/laboratorios-vagrant.md
 - name: Validación y Evaluación
   href: validacion_evaluacion/readme.md
 - name: Gobernanza de Requisitos
   href: gobernanza/readme.md
   items:
+    - name: Estándares
+      href: gobernanza/estandares/README.md
+      items:
+        - name: Directrices Claude Code
+          href: gobernanza/estandares/claude-code-guidelines.md
+        - name: Reglas de Negocio
+          href: gobernanza/estandares/reglas_negocio_ingenieria_requerimientos.md
     - name: Planificación de Releases
       href: gobernanza/planificacion/README.md
     - name: Roadmap trimestral

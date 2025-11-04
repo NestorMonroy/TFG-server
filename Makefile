@@ -1,4 +1,4 @@
-.PHONY: help test test-shunit2 test-all lint lint-markdown lint-shell docs ci release clean install-hooks version
+.PHONY: help test test-shunit2 test-all lint lint-markdown lint-shell docs ci release clean install-hooks version lab-quick lab-professional lab-complete lab-dev lab-destroy lab-status lab-ci lab-test lab-docs lab-docs-serve lab-exec
 
 # Variables
 SHELL := /bin/bash
@@ -149,3 +149,90 @@ check-deps:
 		echo -e "$(COLOR_ERROR)[check-deps] Faltan $$missing dependencia(s)$(COLOR_RESET)"; \
 		exit 1; \
 	fi
+
+#------------------------------------------------------------------------------
+# VAGRANT LABS - VPN and Network Tunnels
+# ADR: docs/diseno_solucion/arquitectura_sistemas/adr/0005-vagrant-laboratorios-vpn.md
+#------------------------------------------------------------------------------
+
+VAGRANT_DIR := $(ROOT_DIR)/infra/vagrant
+
+## lab-quick: Inicia laboratorio Quick Start (SSH puerto 53, 45 min → 5 min)
+lab-quick:
+	@echo -e "$(COLOR_INFO)[lab-quick] Iniciando laboratorio Quick Start...$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-quick] SSH túnel en puerto 53 para acceso rápido a APIs$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant up --vagrantfile=Vagrantfile.quick_start
+	@echo -e "$(COLOR_SUCCESS)[lab-quick] Laboratorio Quick Start iniciado$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-quick] Conectar: cd $(VAGRANT_DIR) && vagrant ssh$(COLOR_RESET)"
+
+## lab-professional: Inicia laboratorio Professional (SSH robusto, 4h → 15 min)
+lab-professional:
+	@echo -e "$(COLOR_INFO)[lab-professional] Iniciando laboratorio Professional...$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-professional] Servidor SSH con seguridad y monitoreo$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant up --vagrantfile=Vagrantfile.professional_tunnel
+	@echo -e "$(COLOR_SUCCESS)[lab-professional] Laboratorio Professional iniciado$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-professional] Conectar: cd $(VAGRANT_DIR) && vagrant ssh$(COLOR_RESET)"
+
+## lab-complete: Inicia laboratorio Complete (Servidor completo, 9h → 30 min)
+lab-complete:
+	@echo -e "$(COLOR_INFO)[lab-complete] Iniciando laboratorio Complete Homeserver...$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-complete] WireGuard + Pi-Hole + Nextcloud + Netdata$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant up --vagrantfile=Vagrantfile.complete_homeserver
+	@echo -e "$(COLOR_SUCCESS)[lab-complete] Laboratorio Complete iniciado$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-complete] Conectar: cd $(VAGRANT_DIR) && vagrant ssh$(COLOR_RESET)"
+
+## lab-status: Muestra estado de laboratorios Vagrant
+lab-status:
+	@echo -e "$(COLOR_INFO)[lab-status] Estado de laboratorios Vagrant:$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant global-status | grep "TFG-VPN" || echo "  No hay laboratorios activos"
+
+## lab-dev: Inicia laboratorio Development (VM completa para desarrollo)
+lab-dev:
+	@echo -e "$(COLOR_INFO)[lab-dev] Iniciando laboratorio Development...$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-dev] VM completa con BATS, shellcheck, mkdocs, etc.$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant up --vagrantfile=Vagrantfile.development
+	@echo -e "$(COLOR_SUCCESS)[lab-dev] Laboratorio Development iniciado$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-dev] Conectar: cd $(VAGRANT_DIR) && vagrant ssh$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-dev] Ejecutar CI: make lab-ci$(COLOR_RESET)"
+
+## lab-destroy: Destruye todos los laboratorios Vagrant
+lab-destroy:
+	@echo -e "$(COLOR_INFO)[lab-destroy] Destruyendo laboratorios Vagrant...$(COLOR_RESET)"
+	@cd $(VAGRANT_DIR) && vagrant destroy -f || true
+	@echo -e "$(COLOR_SUCCESS)[lab-destroy] Laboratorios destruidos$(COLOR_RESET)"
+
+## lab-ci: Ejecuta CI completo dentro de la VM de desarrollo
+lab-ci:
+	@echo -e "$(COLOR_INFO)[lab-ci] Ejecutando CI dentro de VM de desarrollo...$(COLOR_RESET)"
+	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh development "cd /vagrant && make ci"
+	@echo -e "$(COLOR_SUCCESS)[lab-ci] CI ejecutado en VM$(COLOR_RESET)"
+
+## lab-test: Ejecuta tests dentro de la VM de desarrollo
+lab-test:
+	@echo -e "$(COLOR_INFO)[lab-test] Ejecutando tests dentro de VM de desarrollo...$(COLOR_RESET)"
+	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh development "cd /vagrant && make test"
+	@echo -e "$(COLOR_SUCCESS)[lab-test] Tests ejecutados en VM$(COLOR_RESET)"
+
+## lab-docs: Genera documentación dentro de la VM (archivos en site/ del host)
+lab-docs:
+	@echo -e "$(COLOR_INFO)[lab-docs] Generando documentación dentro de VM...$(COLOR_RESET)"
+	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh development "cd /vagrant && make docs"
+	@echo -e "$(COLOR_SUCCESS)[lab-docs] Documentación generada en site/$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-docs] Abrir: open site/index.html$(COLOR_RESET)"
+
+## lab-docs-serve: Sirve documentación desde la VM (accesible en http://localhost:8000)
+lab-docs-serve:
+	@echo -e "$(COLOR_INFO)[lab-docs-serve] Sirviendo documentación desde VM...$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-docs-serve] Acceder en: http://localhost:8000$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-docs-serve] Presiona Ctrl+C para detener$(COLOR_RESET)"
+	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh development "cd /vagrant && mkdocs serve --dev-addr 0.0.0.0:8000"
+
+## lab-exec: Ejecuta comando arbitrario en VM (uso: make lab-exec LAB=dev CMD="ls -la")
+lab-exec:
+	@if [ -z "$(LAB)" ] || [ -z "$(CMD)" ]; then \
+		echo -e "$(COLOR_ERROR)[lab-exec] ERROR: Requiere LAB y CMD$(COLOR_RESET)"; \
+		echo -e "$(COLOR_INFO)[lab-exec] Uso: make lab-exec LAB=development CMD=\"make ci\"$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@echo -e "$(COLOR_INFO)[lab-exec] Ejecutando en $(LAB): $(CMD)$(COLOR_RESET)"
+	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh $(LAB) "$(CMD)"

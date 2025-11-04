@@ -1,0 +1,190 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile.complete_homeserver
+# Laboratorio 3: Servidor Doméstico Completo (VPN + DNS + Cloud + Monitor)
+#
+# Caso de uso: Usuario quiere infraestructura privada completa
+# Tiempo: 9 horas (manual) → 30 minutos (automatizado)
+# Complejidad: ⭐⭐⭐⭐⭐ (Muy Alta)
+# Éxito esperado: 70%
+#
+# Servicios instalados:
+# - WireGuard VPN (puerto 443 UDP)
+# - Pi-Hole (DNS ad-blocker)
+# - Nextcloud (cloud storage)
+# - Netdata (monitoreo en tiempo real)
+# - Cloudflare Tunnel (acceso remoto seguro)
+#
+# Requisitos:
+# - 2GB RAM mínimo
+# - 2 CPUs recomendado
+# - 10GB espacio en disco
+#
+# ADR: docs/diseno_solucion/arquitectura_sistemas/adr/0005-vagrant-laboratorios-vpn.md
+
+Vagrant.configure("2") do |config|
+  # Box base: Ubuntu 22.04 LTS (Jammy Jellyfish)
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.box_version = ">= 20231215.0.0"
+  config.vm.hostname = "vpn-homeserver"
+
+  # Red privada: permite acceso desde host
+  config.vm.network "private_network", ip: "192.168.56.30"
+
+  # SSH
+  config.vm.network "forwarded_port",
+    guest: 22,
+    host: 2230,
+    id: "ssh",
+    auto_correct: true
+
+  # WireGuard VPN (puerto 443 UDP para bypass firewalls)
+  config.vm.network "forwarded_port",
+    guest: 51820,
+    host: 51820,
+    protocol: "udp",
+    auto_correct: true
+
+  # HTTP (Pi-Hole admin, Nextcloud)
+  config.vm.network "forwarded_port",
+    guest: 80,
+    host: 8080,
+    protocol: "tcp",
+    auto_correct: true
+
+  # HTTPS (Pi-Hole, Nextcloud)
+  config.vm.network "forwarded_port",
+    guest: 443,
+    host: 8443,
+    protocol: "tcp",
+    auto_correct: true
+
+  # Netdata (monitoreo)
+  config.vm.network "forwarded_port",
+    guest: 19999,
+    host: 19999,
+    protocol: "tcp",
+    auto_correct: true
+
+  # DNS (Pi-Hole)
+  config.vm.network "forwarded_port",
+    guest: 53,
+    host: 5353,
+    protocol: "udp",
+    auto_correct: true
+
+  config.vm.network "forwarded_port",
+    guest: 53,
+    host: 5353,
+    protocol: "tcp",
+    auto_correct: true
+
+  # VirtualBox provider configuration
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "TFG-VPN-CompleteHomeserver"
+    vb.memory = "2048"   # 2GB para múltiples servicios
+    vb.cpus = 2
+    vb.linked_clone = true
+
+    # Optimizaciones de rendimiento
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
+    vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
+    vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
+
+    # Disco adicional para storage (Nextcloud)
+    # Descomenta si necesitas más espacio
+    # unless File.exist?('.vagrant/storage-disk.vdi')
+    #   vb.customize ['createhd', '--filename', '.vagrant/storage-disk.vdi', '--size', 20 * 1024]
+    # end
+    # vb.customize ['storageattach', :id, '--storagectl', 'SCSI', '--port', 2, '--device', 0, '--type', 'hdd', '--medium', '.vagrant/storage-disk.vdi']
+  end
+
+  # Provisioning: Shell scripts con Clean Code naming
+  # Orden de ejecución es importante
+
+  # 1. Instalar paquetes de seguridad base
+  config.vm.provision "shell",
+    name: "install-security-packages",
+    path: "provisioning/install_security_packages.sh",
+    privileged: true
+
+  # 2. Desplegar WireGuard + servicios completos
+  config.vm.provision "shell",
+    name: "deploy-wireguard-with-services",
+    path: "provisioning/deploy_wireguard_with_services.sh",
+    privileged: true,
+    env: {
+      "PIHOLE_PASSWORD" => "admin",
+      "NEXTCLOUD_ADMIN_USER" => "admin",
+      "NEXTCLOUD_ADMIN_PASS" => "admin"
+    }
+
+  # 3. Validar conectividad de todos los servicios
+  config.vm.provision "shell",
+    name: "validate-tunnel-connectivity",
+    path: "provisioning/validate_tunnel_connectivity.sh",
+    privileged: false
+
+  # Synced folder: compartir datos con Nextcloud
+  config.vm.synced_folder ".", "/vagrant",
+    owner: "vagrant",
+    group: "vagrant",
+    mount_options: ["dmode=775,fmode=664"]
+
+  # Mensaje post-up
+  config.vm.post_up_message = <<~MSG
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║   Servidor Doméstico Completo - Lab Complete Homeserver      ║
+    ╠═══════════════════════════════════════════════════════════════╣
+    ║                                                               ║
+    ║   VM IP: 192.168.56.30                                        ║
+    ║   SSH Port: 2230 (host) → 22 (guest)                          ║
+    ║                                                               ║
+    ║   Servicios instalados:                                       ║
+    ║   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ║
+    ║                                                               ║
+    ║   🔐 WireGuard VPN                                            ║
+    ║      Port: 51820 (UDP)                                        ║
+    ║      Status: sudo systemctl status wg-quick@wg0               ║
+    ║                                                               ║
+    ║   🛡️  Pi-Hole (DNS Ad-Blocker)                                ║
+    ║      Web: http://192.168.56.30/admin                          ║
+    ║      Password: admin                                          ║
+    ║      Status: sudo systemctl status pihole-FTL                 ║
+    ║                                                               ║
+    ║   ☁️  Nextcloud (Cloud Storage)                               ║
+    ║      Web: http://192.168.56.30:8080                           ║
+    ║      User: admin / admin                                      ║
+    ║      Status: sudo systemctl status nextcloud                  ║
+    ║                                                               ║
+    ║   📊 Netdata (Monitoreo)                                      ║
+    ║      Web: http://192.168.56.30:19999                          ║
+    ║      Status: sudo systemctl status netdata                    ║
+    ║                                                               ║
+    ║   Conectar:                                                   ║
+    ║   $ vagrant ssh                                               ║
+    ║                                                               ║
+    ║   Verificar todos los servicios:                              ║
+    ║   $ sudo systemctl status wg-quick@wg0 pihole-FTL \\          ║
+    ║       nextcloud netdata                                       ║
+    ║                                                               ║
+    ║   Ver configuración WireGuard:                                ║
+    ║   $ sudo wg show                                              ║
+    ║                                                               ║
+    ║   Logs centralizados:                                         ║
+    ║   $ sudo journalctl -f                                        ║
+    ║                                                               ║
+    ║   ⚠️  IMPORTANTE:                                              ║
+    ║   - Cambia las contraseñas por defecto en producción          ║
+    ║   - Configura firewall externo si expones servicios           ║
+    ║   - Revisa logs regularmente                                  ║
+    ║                                                               ║
+    ║   Documentación: infra/vagrant/README.md                      ║
+    ║   ADR: docs/.../adr/0005-vagrant-laboratorios-vpn.md          ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+  MSG
+end

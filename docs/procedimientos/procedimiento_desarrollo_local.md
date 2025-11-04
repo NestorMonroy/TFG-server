@@ -10,14 +10,31 @@ Aplica a cualquier contribución de código o documentación que se implemente d
 - **Revisora técnica:** valida que las verificaciones se hayan ejecutado y resuelto.
 
 ## Prerrequisitos
+
+### Desarrollo en host (tradicional)
 - Repositorio clonado y dependencias instaladas (`make setup`, `pip install -e .`).
 - Git hooks instalados mediante `./scripts/bash/spec-hooks-install.sh` para habilitar validaciones automáticas en `pre-commit`, `pre-push` y `post-commit`.
 - Herramientas base verificadas con `./scripts/bash/check-prerequisites.sh`.
+
+### Desarrollo en Vagrant (recomendado para entorno limpio)
+- Vagrant >= 2.3.0 instalado
+- VirtualBox >= 7.0 instalado
+- Repositorio clonado en el host
+- VM de desarrollo levantada con `make lab-dev`
+
+**Ventajas de desarrollo en Vagrant:**
+- ✅ Sin contaminar dependencias del host
+- ✅ Reproducible: todos tienen el mismo ambiente
+- ✅ Ejecutar CI/tests/docs sin SSH: `make lab-ci`, `make lab-test`, `make lab-docs`
+- ✅ Preview de documentación en `http://localhost:8000` con `make lab-docs-serve`
 
 ## Frecuencia
 Debe ejecutarse al iniciar un trabajo nuevo y repetirse antes de publicar ramas o abrir un Pull Request.
 
 ## Pasos
+
+### Opción A: Desarrollo en host (tradicional)
+
 1. **Crear rama de trabajo**
    - Ejecutar `./scripts/bash/create-new-feature.sh` y seguir las instrucciones para nombrar la rama.
 2. **Implementar cambios**
@@ -31,6 +48,44 @@ Debe ejecutarse al iniciar un trabajo nuevo y repetirse antes de publicar ramas 
    - Confirmar que no existen errores pendientes y que los hooks se ejecutan sin bloqueos.
    - Empaquetar cambios con mensajes de commit siguiendo el estándar Conventional Commits.
 
+### Opción B: Desarrollo en Vagrant (recomendado para entorno limpio)
+
+1. **Iniciar VM de desarrollo** (solo primera vez o después de `vagrant destroy`)
+   - Ejecutar `make lab-dev` para crear VM con todas las dependencias
+   - Esperar ~10 minutos mientras se instalan BATS, shellcheck, MkDocs, Python, Node.js, etc.
+
+2. **Crear rama de trabajo** (en el host, NO dentro de la VM)
+   - Ejecutar `./scripts/bash/create-new-feature.sh` y seguir las instrucciones para nombrar la rama.
+   - Los cambios se sincronizan automáticamente con `/vagrant` en la VM gracias al synced folder.
+
+3. **Implementar cambios** (en el host, con tu editor favorito)
+   - Editar archivos normalmente en tu máquina
+   - Los cambios aparecen instantáneamente en la VM
+
+4. **Validación continua desde el host (SIN entrar a la VM)**
+   - Ejecutar `make lab-ci` para correr CI completo dentro de la VM
+   - Ejecutar `make lab-test` para correr solo tests
+   - Ejecutar `make lab-lint` si existe, o `make lab-exec LAB=development CMD="make lint"`
+   - Ver resultados directamente en la terminal del host
+
+5. **Generar y visualizar documentación (SIN entrar a la VM)**
+   - Ejecutar `make lab-docs` para generar documentación
+     - Los archivos HTML aparecen en `site/` del host
+   - Ejecutar `make lab-docs-serve` para preview en vivo
+     - Abrir navegador en `http://localhost:8000`
+     - Presionar Ctrl+C para detener el servidor
+
+6. **Depuración dentro de la VM** (solo si es necesario)
+   - SSH a la VM: `cd infra/vagrant && vagrant ssh --vagrantfile=Vagrantfile.development`
+   - Ir al proyecto: `cd /vagrant`
+   - Ejecutar comandos manualmente: `make ci`, `bats test/vagrant.bats`, etc.
+   - Salir: `exit`
+
+7. **Preparación para compartir**
+   - Confirmar que `make lab-ci` pasa sin errores
+   - Empaquetar cambios con mensajes de commit siguiendo el estándar Conventional Commits
+   - Los commits se hacen en el host, NO dentro de la VM
+
 ## Entregables
 - Rama actualizada con commits verificados.
 - Evidencia de ejecución del flujo (`make ci` exitoso) disponible en el historial local.
@@ -43,3 +98,5 @@ Debe ejecutarse al iniciar un trabajo nuevo y repetirse antes de publicar ramas 
 - `docs/automation/ci-cd.md`
 - `docs/local-development.md`
 - `docs/TROUBLESHOOTING.md`
+- `infra/vagrant/README.md` - Documentación completa de laboratorios Vagrant
+- [ADR 0005: Vagrant para Laboratorios VPN](../diseno_solucion/arquitectura_sistemas/adr/0005-vagrant-laboratorios-vpn.md) - Decisión arquitectónica sobre Vagrant

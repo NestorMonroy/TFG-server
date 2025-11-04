@@ -56,3 +56,11 @@ node_modules/
 Thumbs.db
 .Spotlight-V100
 .Trashes
+
+# Vagrant
+.vagrant/
+*.box
+.vagrant.d/
+ubuntu-*.log
+infra/vagrant/.vagrant/
+infra/vagrant/*.log

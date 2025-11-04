@@ -1,0 +1,220 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# Vagrantfile.development
+# Laboratorio 0: Entorno de Desarrollo Completo
+#
+# Caso de uso: Desarrollar con CI/tests/docs ejecutados en VM aislada
+# Tiempo: 10 minutos setup inicial
+# Complejidad: ⭐⭐⭐ (Media)
+#
+# Características:
+# - ✅ Synced folder: TODO el proyecto sincronizado en /vagrant
+# - ✅ Port forwarding: MkDocs accesible en http://localhost:8000
+# - ✅ Sin SSH: Ejecutar CI/tests/docs desde el host sin entrar a la VM
+# - ✅ Todas las dependencias: BATS, shellcheck, MkDocs, Python, Node.js
+# - ✅ Entorno reproducible: Mismo ambiente para todos los desarrolladores
+#
+# Uso desde el host (SIN SSH):
+#   make lab-dev            # Iniciar VM
+#   make lab-ci             # Ejecutar CI dentro de la VM
+#   make lab-test           # Ejecutar tests dentro de la VM
+#   make lab-docs           # Generar docs (archivos en site/ del host)
+#   make lab-docs-serve     # Servir docs en http://localhost:8000
+#
+# Uso con SSH (si prefieres):
+#   vagrant up --vagrantfile=Vagrantfile.development
+#   vagrant ssh
+#   cd /vagrant
+#   make ci
+#
+# ADR: docs/diseno_solucion/arquitectura_sistemas/adr/0005-vagrant-laboratorios-vpn.md
+
+Vagrant.configure("2") do |config|
+  # Box base: Ubuntu 22.04 LTS (Jammy Jellyfish)
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.box_version = ">= 20231215.0.0"
+  config.vm.hostname = "tfg-development"
+
+  # Red privada: permite acceso desde host
+  config.vm.network "private_network", ip: "192.168.56.40"
+
+  # Puerto SSH estándar
+  config.vm.network "forwarded_port",
+    guest: 22,
+    host: 2240,
+    id: "ssh",
+    auto_correct: true
+
+  # Puerto MkDocs (para mkdocs serve)
+  # Permite acceder a documentación desde el navegador del host: http://localhost:8000
+  # Uso: make lab-docs-serve, luego abrir http://localhost:8000 en navegador
+  config.vm.network "forwarded_port",
+    guest: 8000,
+    host: 8000,
+    protocol: "tcp",
+    auto_correct: true
+
+  # VirtualBox provider configuration
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "TFG-Development"
+    vb.memory = "2048"   # 2GB para desarrollo completo
+    vb.cpus = 2
+    vb.linked_clone = true
+
+    # Optimizaciones de rendimiento
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
+    vb.customize ["modifyvm", :id, "--nictype1", "virtio"]
+    vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
+  end
+
+  # IMPORTANT: Synced folder - Sincroniza TODO el proyecto en tiempo real
+  # ../.. apunta a la raíz del proyecto (2 niveles arriba de infra/vagrant/)
+  # Los cambios en el host aparecen INSTANTÁNEAMENTE en /vagrant de la VM
+  # Los archivos generados en /vagrant (ej: site/) aparecen en el host
+  # Esto permite: editar en host, ejecutar en VM, ver resultados en host
+  config.vm.synced_folder "../..", "/vagrant",
+    owner: "vagrant",
+    group: "vagrant",
+    mount_options: ["dmode=775,fmode=664"]
+
+  # Provisioning: Instalar dependencias de desarrollo
+  config.vm.provision "shell",
+    name: "install-development-dependencies",
+    privileged: true,
+    inline: <<-SHELL
+      set -euo pipefail
+
+      echo "[INFO] Installing development dependencies"
+
+      # Update system
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -qq
+      apt-get upgrade -y -qq
+
+      # Install base tools
+      apt-get install -y -qq \
+        git \
+        make \
+        curl \
+        wget \
+        vim \
+        htop \
+        tree
+
+      # Install Bash testing tools
+      echo "[INFO] Installing BATS"
+      apt-get install -y -qq bats
+
+      # Install shellcheck
+      echo "[INFO] Installing shellcheck"
+      apt-get install -y -qq shellcheck
+
+      # Install Python and pip (for mkdocs)
+      echo "[INFO] Installing Python and pip"
+      apt-get install -y -qq \
+        python3 \
+        python3-pip \
+        python3-venv
+
+      # Install Node.js (for markdownlint-cli2)
+      echo "[INFO] Installing Node.js and npm"
+      curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      apt-get install -y -qq nodejs
+
+      # Install markdownlint-cli2 globally
+      echo "[INFO] Installing markdownlint-cli2"
+      npm install -g markdownlint-cli2
+
+      # Install MkDocs and plugins as vagrant user
+      echo "[INFO] Installing MkDocs and plugins"
+      sudo -u vagrant bash -c 'cd /vagrant && pip3 install --user -r requirements-docs.txt'
+
+      echo "[SUCCESS] All development dependencies installed"
+    SHELL
+
+  # Provisioning: Setup development environment
+  config.vm.provision "shell",
+    name: "setup-development-environment",
+    privileged: false,
+    inline: <<-SHELL
+      set -euo pipefail
+
+      echo "[INFO] Setting up development environment"
+
+      # Add pip binaries to PATH
+      if ! grep -q "export PATH=.*/.local/bin" ~/.bashrc; then
+        echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+      fi
+
+      # Create helpful aliases
+      cat >> ~/.bashrc <<'EOF'
+
+# TFG Development aliases
+alias ll='ls -lah'
+alias tfg='cd /vagrant'
+alias ci='cd /vagrant && make ci'
+alias test='cd /vagrant && make test'
+alias lint='cd /vagrant && make lint'
+alias docs='cd /vagrant && make docs'
+EOF
+
+      echo "[SUCCESS] Development environment configured"
+      echo ""
+      echo "╔═══════════════════════════════════════════════════════════════╗"
+      echo "║   TFG Development Environment Ready                           ║"
+      echo "╠═══════════════════════════════════════════════════════════════╣"
+      echo "║                                                               ║"
+      echo "║   Project location: /vagrant                                  ║"
+      echo "║                                                               ║"
+      echo "║   Useful aliases:                                             ║"
+      echo "║   $ tfg       # cd /vagrant                                   ║"
+      echo "║   $ ci        # Run full CI pipeline                          ║"
+      echo "║   $ test      # Run tests                                     ║"
+      echo "║   $ lint      # Run linters                                   ║"
+      echo "║   $ docs      # Generate docs                                 ║"
+      echo "║                                                               ║"
+      echo "║   Commands:                                                   ║"
+      echo "║   $ cd /vagrant && make help                                  ║"
+      echo "║   $ cd /vagrant && make ci                                    ║"
+      echo "║   $ cd /vagrant && make test                                  ║"
+      echo "║                                                               ║"
+      echo "╚═══════════════════════════════════════════════════════════════╝"
+      echo ""
+    SHELL
+
+  # Mensaje post-up
+  config.vm.post_up_message = <<~MSG
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║   TFG Development VM - Ready ✅                               ║
+    ╠═══════════════════════════════════════════════════════════════╣
+    ║                                                               ║
+    ║   VM IP: 192.168.56.40                                        ║
+    ║   Project synced: /vagrant ↔ host                             ║
+    ║   MkDocs: http://localhost:8000                               ║
+    ║                                                               ║
+    ║   🚀 Uso desde el HOST (sin SSH):                             ║
+    ║   $ make lab-ci             # Ejecutar CI completo            ║
+    ║   $ make lab-test           # Ejecutar tests                  ║
+    ║   $ make lab-docs           # Generar docs (en site/)         ║
+    ║   $ make lab-docs-serve     # Preview en localhost:8000       ║
+    ║                                                               ║
+    ║   📝 Editar archivos:                                          ║
+    ║   - Edita en tu editor favorito (VSCode, Vim, etc.)           ║
+    ║   - Los cambios se sincronizan INSTANTÁNEAMENTE con la VM     ║
+    ║   - Ejecuta comandos desde el host, ve resultados al instante ║
+    ║                                                               ║
+    ║   🔧 SSH (si lo necesitas):                                    ║
+    ║   $ vagrant ssh                                               ║
+    ║   $ cd /vagrant && make ci                                    ║
+    ║                                                               ║
+    ║   📦 Herramientas instaladas:                                  ║
+    ║   ✓ BATS, shellcheck, markdownlint-cli2                       ║
+    ║   ✓ MkDocs + plugins (Material, Mermaid)                      ║
+    ║   ✓ Python 3, Node.js, npm                                    ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+  MSG
+end

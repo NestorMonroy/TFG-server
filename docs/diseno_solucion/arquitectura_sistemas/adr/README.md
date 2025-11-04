@@ -10,6 +10,7 @@ Registro de decisiones arquitectónicas siguiendo el estándar MADR.
 | [0002](0002-migracion-makefile.md) | Migración a Makefile | ACEPTADO | - | Sistema actual de automatización con GNU Make |
 | [0003](0003-servidor-mcp-shell.md) | Servidor MCP en Shell | ACEPTADO | 2025-11-04 | Integración con asistentes de IA vía Model Context Protocol |
 | [0004](0004-migracion-mkdocs.md) | Migración a MkDocs | ACEPTADO | 2025-11-04 | Migración de DocFX a MkDocs para generación de documentación |
+| [0005](0005-vagrant-laboratorios-vpn.md) | Vagrant para Laboratorios VPN | ACEPTADO | 2025-11-04 | Infraestructura automatizada para laboratorios de VPN y túneles de red |
 
 ## Convenciones
 
