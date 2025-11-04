@@ -1,4 +1,4 @@
-.PHONY: help test test-shunit2 test-all lint lint-markdown lint-shell docs ci release clean install-hooks version lab-quick lab-professional lab-complete lab-dev lab-destroy lab-status lab-ci lab-test lab-exec
+.PHONY: help test test-shunit2 test-all lint lint-markdown lint-shell docs ci release clean install-hooks version lab-quick lab-professional lab-complete lab-dev lab-destroy lab-status lab-ci lab-test lab-docs lab-docs-serve lab-exec
 
 # Variables
 SHELL := /bin/bash
@@ -212,6 +212,20 @@ lab-test:
 	@echo -e "$(COLOR_INFO)[lab-test] Ejecutando tests dentro de VM de desarrollo...$(COLOR_RESET)"
 	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh development "cd /vagrant && make test"
 	@echo -e "$(COLOR_SUCCESS)[lab-test] Tests ejecutados en VM$(COLOR_RESET)"
+
+## lab-docs: Genera documentación dentro de la VM (archivos en site/ del host)
+lab-docs:
+	@echo -e "$(COLOR_INFO)[lab-docs] Generando documentación dentro de VM...$(COLOR_RESET)"
+	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh development "cd /vagrant && make docs"
+	@echo -e "$(COLOR_SUCCESS)[lab-docs] Documentación generada en site/$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-docs] Abrir: open site/index.html$(COLOR_RESET)"
+
+## lab-docs-serve: Sirve documentación desde la VM (accesible en http://localhost:8000)
+lab-docs-serve:
+	@echo -e "$(COLOR_INFO)[lab-docs-serve] Sirviendo documentación desde VM...$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-docs-serve] Acceder en: http://localhost:8000$(COLOR_RESET)"
+	@echo -e "$(COLOR_INFO)[lab-docs-serve] Presiona Ctrl+C para detener$(COLOR_RESET)"
+	@$(ROOT_DIR)/scripts/bash/vagrant-exec.sh development "cd /vagrant && mkdocs serve --dev-addr 0.0.0.0:8000"
 
 ## lab-exec: Ejecuta comando arbitrario en VM (uso: make lab-exec LAB=dev CMD="ls -la")
 lab-exec:

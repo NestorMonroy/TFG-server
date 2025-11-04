@@ -114,7 +114,14 @@ El servidor se configura automáticamente al abrir el proyecto en devcontainer. 
 El proyecto incluye **laboratorios Vagrant** para aprender y validar configuraciones de VPN y túneles de red sin afectar infraestructura productiva:
 
 ```bash
-# Iniciar laboratorios
+# Desarrollo: VM completa para CI/tests/docs
+make lab-dev            # Iniciar entorno de desarrollo
+make lab-ci             # Ejecutar CI dentro de la VM
+make lab-test           # Ejecutar tests dentro de la VM
+make lab-docs           # Generar documentación sin entrar en la VM
+make lab-docs-serve     # Servir docs en http://localhost:8000
+
+# Iniciar laboratorios de VPN
 make lab-quick          # SSH túnel puerto 53 (45 min → 5 min)
 make lab-professional   # Servidor SSH seguro (4h → 15 min)
 make lab-complete       # Infraestructura completa (9h → 30 min)

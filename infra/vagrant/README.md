@@ -70,6 +70,8 @@ infra/vagrant/
 make lab-dev            # Iniciar VM de desarrollo
 make lab-ci             # Ejecutar CI dentro de la VM
 make lab-test           # Ejecutar tests dentro de la VM
+make lab-docs           # Generar documentación dentro de la VM
+make lab-docs-serve     # Servir docs desde la VM (http://localhost:8000)
 
 # Laboratorios de VPN
 make lab-quick          # Iniciar Lab Quick Start (SSH puerto 53)
@@ -120,6 +122,7 @@ vagrant destroy -f
 - ✅ Sincroniza TODO el proyecto (`/vagrant`)
 - ✅ Instala TODAS las dependencias de desarrollo
 - ✅ Ejecuta `make ci`, `make test`, `make lint` dentro de la VM
+- ✅ Genera documentación (`make docs`) sin entrar en la VM
 - ✅ Entorno completamente aislado del host
 
 **Herramientas instaladas**:
@@ -151,6 +154,21 @@ make test         # Ejecutar tests
 make lint         # Ejecutar linters
 ```
 
+**Generar documentación (sin entrar en la VM)**:
+```bash
+# Generar documentación dentro de la VM
+# Los archivos generados aparecen en site/ del host gracias al synced folder
+make lab-docs
+
+# Servir documentación desde la VM
+# Accesible en http://localhost:8000 desde el navegador del host
+make lab-docs-serve
+
+# Equivalente a:
+./scripts/bash/vagrant-exec.sh development "cd /vagrant && make docs"
+./scripts/bash/vagrant-exec.sh development "cd /vagrant && mkdocs serve --dev-addr 0.0.0.0:8000"
+```
+
 **Ejecutar comandos arbitrarios**:
 ```bash
 # Desde el host
@@ -173,6 +191,7 @@ make lab-exec LAB=development CMD="ls -la /vagrant"
 - ✅ **Reproducible**: Todos tienen mismo ambiente
 - ✅ **Limpio**: `vagrant destroy` limpia todo
 - ✅ **Rápido**: Synced folder = cambios instantáneos
+- ✅ **Sin SSH**: Genera docs y ejecuta CI desde el host sin entrar en la VM
 
 ---
 
