@@ -103,7 +103,7 @@ Uso: Servidor doméstico completo
 
 ## Decisión
 
-Se implementa **infraestructura Vagrant** en `infra/vagrant/` con **3 Vagrantfiles** correspondientes a los flujos principales:
+Se implementa **infraestructura Vagrant** en `infra/vagrant/` con **4 Vagrantfiles** correspondientes a los flujos principales + entorno de desarrollo:
 
 ### Arquitectura propuesta
 
@@ -111,9 +111,10 @@ Se implementa **infraestructura Vagrant** en `infra/vagrant/` con **3 Vagrantfil
 infra/
 └── vagrant/
     ├── README.md                           # Guía de uso y decisión
-    ├── Vagrantfile.quick_start             # Flujo 1: 45 min
-    ├── Vagrantfile.professional_tunnel     # Flujo 2: 4 horas
-    ├── Vagrantfile.complete_homeserver     # Flujo 3: 9 horas
+    ├── Vagrantfile.development             # Lab 0: Entorno de desarrollo (10 min)
+    ├── Vagrantfile.quick_start             # Lab 1: SSH túnel puerto 53 (45 min)
+    ├── Vagrantfile.professional_tunnel     # Lab 2: Servidor SSH profesional (4 horas)
+    ├── Vagrantfile.complete_homeserver     # Lab 3: Infraestructura completa (9 horas)
     └── provisioning/
         ├── establish_ssh_tunnel_on_port_53.sh
         ├── configure_professional_ssh_server.sh
@@ -193,6 +194,115 @@ infra/
 ```
 
 ### Vagrantfiles implementados
+
+#### 0. Vagrantfile.development (Nuevo: 2025-11-04)
+
+**Propósito**: Entorno de desarrollo completo para ejecutar CI, tests y documentación sin contaminar el host.
+
+**Caso de uso**: Developer quiere ejecutar `make ci`, `make test` y `make docs` dentro de VM aislada.
+
+**Tiempo**: 10 minutos setup inicial.
+
+**Características únicas**:
+- ✅ **Synced folder**: Todo el proyecto sincronizado en `/vagrant` (cambios en tiempo real)
+- ✅ **Port forwarding 8000**: MkDocs accesible desde el host en `http://localhost:8000`
+- ✅ **Generación de docs sin SSH**: `make lab-docs` genera documentación sin entrar a la VM
+- ✅ **Todas las dependencias**: BATS, shellcheck, markdownlint, MkDocs, Python, Node.js
+
+```ruby
+# infra/vagrant/Vagrantfile.development
+Vagrant.configure("2") do |config|
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.hostname = "tfg-development"
+
+  # Synced folder - TODO el proyecto sincronizado
+  config.vm.synced_folder "../..", "/vagrant",
+    owner: "vagrant",
+    group: "vagrant",
+    mount_options: ["dmode=775,fmode=664"]
+
+  # Port forwarding para SSH
+  config.vm.network "forwarded_port",
+    guest: 22,
+    host: 2200,
+    id: "ssh",
+    auto_correct: true
+
+  # Port forwarding para MkDocs serve
+  config.vm.network "forwarded_port",
+    guest: 8000,
+    host: 8000,
+    protocol: "tcp",
+    auto_correct: true
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "TFG-Development"
+    vb.memory = "2048"
+    vb.cpus = 2
+  end
+
+  # Provisioning: Instalar TODAS las dependencias de desarrollo
+  config.vm.provision "shell", inline: <<-SHELL
+    # Actualizar sistema
+    apt-get update
+    apt-get upgrade -y
+
+    # BATS (testing)
+    git clone https://github.com/bats-core/bats-core.git /tmp/bats
+    cd /tmp/bats && ./install.sh /usr/local
+
+    # shellcheck (linting)
+    apt-get install -y shellcheck
+
+    # Python + pip (para MkDocs)
+    apt-get install -y python3 python3-pip
+
+    # MkDocs + plugins
+    pip3 install mkdocs mkdocs-material mkdocs-mermaid2-plugin
+
+    # Node.js + npm (para markdownlint)
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | bash -
+    apt-get install -y nodejs
+
+    # markdownlint-cli2
+    npm install -g markdownlint-cli2
+
+    echo "✅ Entorno de desarrollo configurado"
+    echo "   - BATS: $(bats --version)"
+    echo "   - shellcheck: $(shellcheck --version | head -n1)"
+    echo "   - Python: $(python3 --version)"
+    echo "   - MkDocs: $(mkdocs --version)"
+    echo "   - Node.js: $(node --version)"
+    echo "   - markdownlint: $(markdownlint-cli2 --version)"
+  SHELL
+end
+```
+
+**Uso desde el host (sin SSH)**:
+
+```bash
+# Iniciar VM de desarrollo
+make lab-dev
+
+# Ejecutar CI completo dentro de la VM
+make lab-ci
+
+# Ejecutar tests dentro de la VM
+make lab-test
+
+# Generar documentación (archivos aparecen en site/ del host)
+make lab-docs
+
+# Servir documentación desde la VM (accesible en http://localhost:8000)
+make lab-docs-serve
+```
+
+**Ventajas**:
+- ✅ Sin conflictos con dependencias del host
+- ✅ Reproducible: todos tienen el mismo ambiente
+- ✅ Limpio: `vagrant destroy` elimina todo
+- ✅ Rápido: synced folder = cambios instantáneos
+- ✅ **Sin SSH**: Genera docs y ejecuta CI desde el host sin entrar en la VM
 
 #### 1. Vagrantfile.quick_start
 
@@ -347,13 +457,22 @@ Verbos permitidos:
 7. ✅ **Onboarding**: Nuevos miembros tienen lab listo en minutos
 8. ✅ **Testing**: Validar configs antes de deploy real
 
+### Positivas (Lab Development - Agregado 2025-11-04)
+
+9. ✅ **Desarrollo aislado**: CI/tests/docs en VM sin contaminar host
+10. ✅ **Documentación sin SSH**: `make lab-docs` genera docs sin entrar a la VM
+11. ✅ **Port forwarding MkDocs**: Preview de documentación en `http://localhost:8000`
+12. ✅ **Synced folder**: Cambios en archivos sincronizados en tiempo real
+13. ✅ **Reproducibilidad extrema**: Todos tienen exactamente las mismas dependencias
+14. ✅ **CI local limpio**: Validar CI en ambiente limpio antes de push
+
 ### Positivas (Clean Code)
 
-9. ✅ **Nombres reveladores**: Arquitectura auto-explicativa
-10. ✅ **Mantenibilidad**: Scripts independientes de Vagrant
-11. ✅ **Búsqueda eficiente**: Nombres descriptivos facilitan grep
-12. ✅ **Pronunciables**: Fácil comunicación en equipo
-13. ✅ **Una palabra por concepto**: Vocabulario consistente
+15. ✅ **Nombres reveladores**: Arquitectura auto-explicativa
+16. ✅ **Mantenibilidad**: Scripts independientes de Vagrant
+17. ✅ **Búsqueda eficiente**: Nombres descriptivos facilitan grep
+18. ✅ **Pronunciables**: Fácil comunicación en equipo
+19. ✅ **Una palabra por concepto**: Vocabulario consistente
 
 ### Negativas (mitigadas)
 
@@ -372,10 +491,32 @@ Verbos permitidos:
 ## Integración con Makefile
 
 ```makefile
-# Makefile (nuevos targets)
+# Makefile (targets de Vagrant)
 
-.PHONY: lab-quick lab-professional lab-complete lab-destroy
+.PHONY: lab-dev lab-ci lab-test lab-docs lab-docs-serve lab-quick lab-professional lab-complete lab-destroy lab-status lab-exec
 
+# Lab Development (Nuevo: 2025-11-04)
+lab-dev:
+	@echo "[INFO] Iniciando laboratorio Development (VM completa para desarrollo)"
+	cd infra/vagrant && vagrant up --vagrantfile=Vagrantfile.development
+
+lab-ci:
+	@echo "[INFO] Ejecutando CI dentro de la VM de desarrollo"
+	./scripts/bash/vagrant-exec.sh development "cd /vagrant && make ci"
+
+lab-test:
+	@echo "[INFO] Ejecutando tests dentro de la VM de desarrollo"
+	./scripts/bash/vagrant-exec.sh development "cd /vagrant && make test"
+
+lab-docs:
+	@echo "[INFO] Generando documentación dentro de la VM (archivos en site/)"
+	./scripts/bash/vagrant-exec.sh development "cd /vagrant && make docs"
+
+lab-docs-serve:
+	@echo "[INFO] Sirviendo documentación desde la VM (http://localhost:8000)"
+	./scripts/bash/vagrant-exec.sh development "cd /vagrant && mkdocs serve --dev-addr 0.0.0.0:8000"
+
+# Labs de VPN
 lab-quick:
 	@echo "[INFO] Iniciando laboratorio Quick Start (SSH puerto 53)"
 	cd infra/vagrant && vagrant up --vagrantfile=Vagrantfile.quick_start
@@ -388,22 +529,43 @@ lab-complete:
 	@echo "[INFO] Iniciando laboratorio Complete (WireGuard + servicios)"
 	cd infra/vagrant && vagrant up --vagrantfile=Vagrantfile.complete_homeserver
 
+# Gestión
+lab-status:
+	@echo "[INFO] Estado de laboratorios Vagrant"
+	cd infra/vagrant && vagrant global-status --prune
+
 lab-destroy:
 	@echo "[INFO] Destruyendo laboratorios Vagrant"
 	cd infra/vagrant && vagrant destroy -f
+
+lab-exec:
+	@./scripts/bash/vagrant-exec.sh $(LAB) "$(CMD)"
 ```
 
 ## Verificación de éxito
 
 La implementación se considera exitosa cuando:
 
+### Labs de VPN (Original)
 1. ✅ `vagrant up --vagrantfile=Vagrantfile.quick_start` crea VM funcional
 2. ✅ SSH túnel en puerto 53 permite acceso a APIs bloqueadas
 3. ✅ `vagrant up --vagrantfile=Vagrantfile.professional_tunnel` configura seguridad
 4. ✅ `vagrant up --vagrantfile=Vagrantfile.complete_homeserver` despliega servicios
 5. ✅ Scripts de provisioning son ejecutables independientemente
 6. ✅ `make lab-quick`, `make lab-professional`, `make lab-complete` funcionan
-7. ✅ Documentación en `infra/vagrant/README.md` es clara y completa
+
+### Lab Development (Agregado 2025-11-04)
+7. ✅ `make lab-dev` crea VM de desarrollo con todas las dependencias
+8. ✅ `make lab-ci` ejecuta CI completo dentro de la VM desde el host
+9. ✅ `make lab-test` ejecuta tests dentro de la VM desde el host
+10. ✅ `make lab-docs` genera documentación sin SSH (archivos en `site/` del host)
+11. ✅ `make lab-docs-serve` sirve documentación en `http://localhost:8000`
+12. ✅ Synced folder sincroniza cambios en tiempo real entre host y VM
+13. ✅ Port forwarding permite acceder a MkDocs desde el navegador del host
+
+### General
+14. ✅ Documentación en `infra/vagrant/README.md` es clara y completa
+15. ✅ ADR 0005 documenta todas las decisiones arquitectónicas
 
 ## Referencias
 

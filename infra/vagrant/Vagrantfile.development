@@ -2,19 +2,27 @@
 # vi: set ft=ruby :
 
 # Vagrantfile.development
-# Laboratorio de Desarrollo: VM completa para desarrollar y ejecutar CI
+# Laboratorio 0: Entorno de Desarrollo Completo
 #
-# Caso de uso: Desarrollar dentro de Vagrant, ejecutar tests, CI completo
+# Caso de uso: Desarrollar con CI/tests/docs ejecutados en VM aislada
 # Tiempo: 10 minutos setup inicial
 # Complejidad: ⭐⭐⭐ (Media)
 #
 # Características:
-# - Synced folder del proyecto completo
-# - Todas las dependencias de desarrollo instaladas
-# - Puede ejecutar make ci, make test, make lint
-# - Entorno aislado para desarrollo
+# - ✅ Synced folder: TODO el proyecto sincronizado en /vagrant
+# - ✅ Port forwarding: MkDocs accesible en http://localhost:8000
+# - ✅ Sin SSH: Ejecutar CI/tests/docs desde el host sin entrar a la VM
+# - ✅ Todas las dependencias: BATS, shellcheck, MkDocs, Python, Node.js
+# - ✅ Entorno reproducible: Mismo ambiente para todos los desarrolladores
 #
-# Uso:
+# Uso desde el host (SIN SSH):
+#   make lab-dev            # Iniciar VM
+#   make lab-ci             # Ejecutar CI dentro de la VM
+#   make lab-test           # Ejecutar tests dentro de la VM
+#   make lab-docs           # Generar docs (archivos en site/ del host)
+#   make lab-docs-serve     # Servir docs en http://localhost:8000
+#
+# Uso con SSH (si prefieres):
 #   vagrant up --vagrantfile=Vagrantfile.development
 #   vagrant ssh
 #   cd /vagrant
@@ -39,6 +47,8 @@ Vagrant.configure("2") do |config|
     auto_correct: true
 
   # Puerto MkDocs (para mkdocs serve)
+  # Permite acceder a documentación desde el navegador del host: http://localhost:8000
+  # Uso: make lab-docs-serve, luego abrir http://localhost:8000 en navegador
   config.vm.network "forwarded_port",
     guest: 8000,
     host: 8000,
@@ -60,7 +70,11 @@ Vagrant.configure("2") do |config|
     vb.customize ["modifyvm", :id, "--nictype2", "virtio"]
   end
 
-  # IMPORTANT: Synced folder - Sincroniza TODO el proyecto
+  # IMPORTANT: Synced folder - Sincroniza TODO el proyecto en tiempo real
+  # ../.. apunta a la raíz del proyecto (2 niveles arriba de infra/vagrant/)
+  # Los cambios en el host aparecen INSTANTÁNEAMENTE en /vagrant de la VM
+  # Los archivos generados en /vagrant (ej: site/) aparecen en el host
+  # Esto permite: editar en host, ejecutar en VM, ver resultados en host
   config.vm.synced_folder "../..", "/vagrant",
     owner: "vagrant",
     group: "vagrant",
@@ -174,25 +188,32 @@ EOF
   # Mensaje post-up
   config.vm.post_up_message = <<~MSG
     ╔═══════════════════════════════════════════════════════════════╗
-    ║   TFG Development VM - Ready                                  ║
+    ║   TFG Development VM - Ready ✅                               ║
     ╠═══════════════════════════════════════════════════════════════╣
     ║                                                               ║
     ║   VM IP: 192.168.56.40                                        ║
-    ║   SSH: vagrant ssh                                            ║
-    ║   Project: /vagrant                                           ║
+    ║   Project synced: /vagrant ↔ host                             ║
+    ║   MkDocs: http://localhost:8000                               ║
     ║                                                               ║
-    ║   Installed tools:                                            ║
-    ║   ✓ BATS (testing)                                            ║
-    ║   ✓ shellcheck (linting)                                      ║
-    ║   ✓ markdownlint-cli2 (linting)                               ║
-    ║   ✓ MkDocs + plugins (documentation)                          ║
+    ║   🚀 Uso desde el HOST (sin SSH):                             ║
+    ║   $ make lab-ci             # Ejecutar CI completo            ║
+    ║   $ make lab-test           # Ejecutar tests                  ║
+    ║   $ make lab-docs           # Generar docs (en site/)         ║
+    ║   $ make lab-docs-serve     # Preview en localhost:8000       ║
     ║                                                               ║
-    ║   Quick start:                                                ║
+    ║   📝 Editar archivos:                                          ║
+    ║   - Edita en tu editor favorito (VSCode, Vim, etc.)           ║
+    ║   - Los cambios se sincronizan INSTANTÁNEAMENTE con la VM     ║
+    ║   - Ejecuta comandos desde el host, ve resultados al instante ║
+    ║                                                               ║
+    ║   🔧 SSH (si lo necesitas):                                    ║
     ║   $ vagrant ssh                                               ║
-    ║   $ cd /vagrant                                               ║
-    ║   $ make ci                                                   ║
+    ║   $ cd /vagrant && make ci                                    ║
     ║                                                               ║
-    ║   All changes in /vagrant are synced with your host!          ║
+    ║   📦 Herramientas instaladas:                                  ║
+    ║   ✓ BATS, shellcheck, markdownlint-cli2                       ║
+    ║   ✓ MkDocs + plugins (Material, Mermaid)                      ║
+    ║   ✓ Python 3, Node.js, npm                                    ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
   MSG
