@@ -109,10 +109,43 @@ El servidor se configura automáticamente al abrir el proyecto en devcontainer. 
 - [Servidor MCP - Guía de Implementación](docs/implementacion/infrastructure/mcp-server.md)
 - [ADR 0003: Servidor MCP en Shell](docs/diseno_solucion/arquitectura_sistemas/adr/0003-servidor-mcp-shell.md)
 
+## 🧪 Laboratorios Vagrant
+
+El proyecto incluye **laboratorios Vagrant** para aprender y validar configuraciones de VPN y túneles de red sin afectar infraestructura productiva:
+
+```bash
+# Iniciar laboratorios
+make lab-quick          # SSH túnel puerto 53 (45 min → 5 min)
+make lab-professional   # Servidor SSH seguro (4h → 15 min)
+make lab-complete       # Infraestructura completa (9h → 30 min)
+
+# Gestión
+make lab-status         # Ver estado de laboratorios
+make lab-destroy        # Destruir todos los labs
+```
+
+**Servicios desplegados**:
+- **Lab Quick Start**: SSH en puerto 53, túnel SOCKS5 para APIs bloqueadas
+- **Lab Professional**: SSH + Fail2Ban + UFW + servicio systemd con auto-restart
+- **Lab Complete Homeserver**: WireGuard VPN + Pi-Hole + Nextcloud + Netdata
+
+**Beneficios**:
+- ✅ Reproducibilidad: Entornos idénticos con `vagrant up`
+- ✅ Sin riesgo: Errores solo afectan VM local
+- ✅ Sin costo: VirtualBox es gratis
+- ✅ Educación práctica: Aprender ejecutando, no solo leyendo
+
+**Documentación**:
+- [Guía de Laboratorios Vagrant](docs/implementacion/infrastructure/laboratorios-vagrant.md)
+- [ADR 0005: Vagrant para Laboratorios VPN](docs/diseno_solucion/arquitectura_sistemas/adr/0005-vagrant-laboratorios-vpn.md)
+- [README técnico](infra/vagrant/README.md)
+
 ## Documentación de decisiones
 
 Las decisiones arquitectónicas se registran en `docs/diseno_solucion/arquitectura_sistemas/adr/`:
 
+- [ADR 0005: Vagrant para Laboratorios VPN](docs/diseno_solucion/arquitectura_sistemas/adr/0005-vagrant-laboratorios-vpn.md) - Infraestructura para labs de VPN
+- [ADR 0004: Migración a MkDocs](docs/diseno_solucion/arquitectura_sistemas/adr/0004-migracion-mkdocs.md) - Generación de documentación
 - [ADR 0003: Servidor MCP en Shell](docs/diseno_solucion/arquitectura_sistemas/adr/0003-servidor-mcp-shell.md) - Integración con asistentes de IA
 - [ADR 0002: Migración a Makefile](docs/diseno_solucion/arquitectura_sistemas/adr/0002-migracion-makefile.md) - Sistema actual de automatización
 - [ADR 0001: Codex CLI](docs/diseno_solucion/arquitectura_sistemas/adr/0001-ejecucion-codex.md) - **DEPRECADO** (reemplazado por Makefile)
